@@ -1446,24 +1446,30 @@ function downloadCSV() {
 
     const { principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData, frequency, sipfrequency } = currentCalculationData;
 
-    // Helper to remove commas from formatted currency
-    function sanitizeNumberForCSV(amount) {
-        return formatCurrency(amount).replace(/,/g, '').replace(/₹|$/g, '');
+    // Helper to format numbers with spaces instead of commas, based on currency
+    function formatNumberWithSpaces(amount) {
+        if (currentCurrency === 'USD') {
+            return amount.toLocaleString('en-US').replace(/,/g, ' ');
+        } else {
+            return amount.toLocaleString('en-IN').replace(/,/g, ' ');
+        }
     }
 
     // Get proper frequency labels
     const compoundingFreq = getFrequencyText(parseInt(document.getElementById('compoundingFrequency').value));
     const sipFreq = getFrequencyText(parseInt(document.getElementById('paymentFrequency').value));
+    const currencyName = (currentCurrency === 'USD') ? 'USD' : 'INR';
 
     let csv = '';
     csv += 'Investment Report\n';
     csv += 'Generated on,' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + '\n\n';
 
     csv += 'Input Parameters\n';
-    csv += 'Lump Sum,' + sanitizeNumberForCSV(principal) + '\n';
-    csv += 'SIP Amount,' + sanitizeNumberForCSV(sipAmount) +','+ sipFreq + '\n';
+    csv += 'Lump Sum,' + formatNumberWithSpaces(principal) + '\n';
+    csv += 'SIP Amount,' + formatNumberWithSpaces(sipAmount) + ',' + sipFreq + '\n';
     csv += 'Annual Return,' + rate + '%\n';
     csv += 'Time,' + time + ' Years, Compounding ' + compoundingFreq + '\n';
+    csv += 'Currency,' + currencyName + '\n';
     
     // Add step-up info if applicable
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
@@ -1473,22 +1479,22 @@ function downloadCSV() {
     csv += '\n';
 
     csv += 'Results Summary\n';
-    csv += 'Total Invested,' + sanitizeNumberForCSV(totalContributions) + '\n';
-    csv += 'Interest Earned,' + sanitizeNumberForCSV(totalInterest) + '\n';
-    csv += 'Final Amount,' + sanitizeNumberForCSV(totalAmount) + '\n\n';
+    csv += 'Total Invested,' + formatNumberWithSpaces(totalContributions) + '\n';
+    csv += 'Interest Earned,' + formatNumberWithSpaces(totalInterest) + '\n';
+    csv += 'Final Amount,' + formatNumberWithSpaces(totalAmount) + '\n\n';
 
     csv += 'Growth Summary\n';
     csv += 'Year,Total Invested,Interest This Year,Total Interest,Total Amount\n';
 
-    // Include ALL growth data points
+    // Include ALL growth data points (numbers only, no currency symbols)
     for (let i = 0; i < growthData.length; i++) {
         const item = growthData[i];
         const interestThisYear = item.interest - (growthData[i - 1]?.interest || 0);
         csv += item.year + ',' +
-               sanitizeNumberForCSV(item.contributions) + ',' +
-               sanitizeNumberForCSV(interestThisYear) + ',' +
-               sanitizeNumberForCSV(item.interest) + ',' +
-               sanitizeNumberForCSV(item.totalAmount) + '\n';
+               formatNumberWithSpaces(item.contributions) + ',' +
+               formatNumberWithSpaces(interestThisYear) + ',' +
+               formatNumberWithSpaces(item.interest) + ',' +
+               formatNumberWithSpaces(item.totalAmount) + '\n';
     }
 
     const filename = 'investment_report_' + new Date().toISOString().split('T')[0] + '.csv';
@@ -1516,6 +1522,7 @@ function downloadPDF() {
     const compoundingFreq = getFrequencyText(parseInt(document.getElementById('compoundingFrequency').value));
     const sipFreq = getFrequencyText(parseInt(document.getElementById('paymentFrequency').value));
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
+    const currencyName = (currentCurrency === 'USD') ? 'USD' : 'INR';
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
@@ -1533,16 +1540,21 @@ function downloadPDF() {
     doc.setFont(undefined, 'bold');
     doc.text('Input Parameters', 20, 50);
 
+    // local helper to remove currency symbols but keep formatting (commas/decimals)
+    const stripSymbols = (amt) => formatCurrency(amt).replace(/[₹$]/g, '');
+
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
     let yPos = 60;
-    doc.text('Lump Sum: ' + formatCurrency(principal), 20, yPos);
+    doc.text('Lump Sum: ' + stripSymbols(principal), 20, yPos);
     yPos += 8;
-    doc.text('SIP Amount: ' + formatCurrency(sipAmount) +' '+ sipFreq, 20, yPos);
+    doc.text('SIP Amount: ' + stripSymbols(sipAmount) + ' ' + sipFreq, 20, yPos);
     yPos += 8;
     doc.text('Annual Return: ' + rate + '%', 20, yPos);
     yPos += 8;
-    doc.text('Time: ' + time + ' Years, Compounding '+ compoundingFreq, 20, yPos);
+    doc.text('Time: ' + time + ' Years, Compounding ' + compoundingFreq, 20, yPos);
+    yPos += 8;
+    doc.text('Currency: ' + currencyName, 20, yPos);
 
     if (stepupPercentage > 0) {
         yPos += 8;
@@ -1558,11 +1570,11 @@ function downloadPDF() {
     yPos += 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
-    doc.text('Total Invested: ' + formatCurrency(totalContributions), 20, yPos);
+    doc.text('Total Invested: ' + stripSymbols(totalContributions), 20, yPos);
     yPos += 8;
-    doc.text('Total Interest Earned: ' + formatCurrency(totalInterest), 20, yPos);
+    doc.text('Total Interest Earned: ' + stripSymbols(totalInterest), 20, yPos);
     yPos += 8;
-    doc.text('Final Amount: ' + formatCurrency(totalAmount), 20, yPos);
+    doc.text('Final Amount: ' + stripSymbols(totalAmount), 20, yPos);
 
     // Growth Summary Table
     yPos += 20;
@@ -1583,7 +1595,7 @@ function downloadPDF() {
 
     yPos += 8;
 
-    // Show ALL growth data, handle page breaks
+    // Show ALL growth data, handle page breaks, values only (no currency symbols)
     for (let i = 0; i < growthData.length; i++) {
         // Check if we need a new page
         if (yPos > 270) {
@@ -1604,17 +1616,17 @@ function downloadPDF() {
         const item = growthData[i];
         const interestThisYear = item.interest - (growthData[i - 1]?.interest || 0);
         
-        // Format numbers to fit in columns
+        // Format numbers to fit in columns (no currency symbols)
         const formatForPDF = (amount) => {
-            const formatted = formatCurrency(amount);
+            const formatted = formatCurrency(amount).replace(/[₹$]/g, '');
             if (formatted.length > 12) {
-                // Truncate long numbers for PDF display
+                // Truncate long numbers for PDF display (suffixes without symbols)
                 if (currentCurrency === 'INR') {
-                    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
-                    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+                    if (amount >= 10000000) return (amount / 10000000).toFixed(1) + 'Cr';
+                    if (amount >= 100000) return (amount / 100000).toFixed(1) + 'L';
                 } else {
-                    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-                    if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
+                    if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M';
+                    if (amount >= 1000) return (amount / 1000).toFixed(1) + 'K';
                 }
             }
             return formatted;
