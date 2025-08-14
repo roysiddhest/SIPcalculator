@@ -1289,24 +1289,12 @@ font-weight: 600;
     </div>
 </div>
 
-<!-- Keep your existing SIP history dropdown -->
-<div class="sip-history-dropdown" id="sipHistoryDropdown" style="display: none;">
-    <div class="sip-history-list" id="sipHistoryList">
-        <div style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 12px;">
-            No saved calculations yet
-        </div>
-    </div>
-    <button class="clear-history-mini" onclick="clearSipHistory()" style="margin-top: 8px;">Clear All</button>
-</div>
-
-
-
 
 <!-- ADD THIS DROPDOWN CONTAINER -->
 <div class="sip-history-dropdown" id="sipHistoryDropdown" style="display: none;">
     <div class="sip-history-list" id="sipHistoryList">
         <div style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 12px;">
-            No saved calculations yet
+            No History
         </div>
     </div>
     <button class="clear-history-mini" onclick="clearSipHistory()" style="margin-top: 8px;">Clear All</button>
@@ -1324,7 +1312,7 @@ font-weight: 600;
 <div class="chart-percentage-display" id="chartPercentages"></div>
 </div>
 <div class="growth-graph-container">
-<div class="growth-graph-title">Growth Over Time</div>
+<div class="growth-graph-title">Interactive Growth Chart</div>
 <div class="growth-chart-wrapper">
 <canvas id="growthChart"></canvas>
 </div>
@@ -1455,134 +1443,209 @@ function downloadCSV() {
         alert('Please calculate results first');
         return;
     }
-    
-    const { principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData } = currentCalculationData;
-    
-    // Simple CSV content - no fancy escaping needed
+
+    const { principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData, frequency, sipfrequency } = currentCalculationData;
+
+    // Helper to remove commas from formatted currency
+    function sanitizeNumberForCSV(amount) {
+        return formatCurrency(amount).replace(/,/g, '').replace(/₹|$/g, '');
+    }
+
+    // Get proper frequency labels
+    const compoundingFreq = getFrequencyText(parseInt(document.getElementById('compoundingFrequency').value));
+    const sipFreq = getFrequencyText(parseInt(document.getElementById('paymentFrequency').value));
+
     let csv = '';
-    csv += 'Investment Calculator Report\n';
-    csv += 'Generated on,' + new Date().toLocaleDateString() + '\n\n';
-    
-    csv += 'INPUT PARAMETERS\n';
-    csv += 'Initial Amount,' + principal + '\n';
-    csv += 'SIP Amount,' + sipAmount + '\n';
+    csv += 'Investment Report\n';
+    csv += 'Generated on,' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) + '\n\n';
+
+    csv += 'Input Parameters\n';
+    csv += 'Lump Sum,' + sanitizeNumberForCSV(principal) + '\n';
+    csv += 'SIP Amount,' + sanitizeNumberForCSV(sipAmount) +','+ sipFreq + '\n';
     csv += 'Annual Return,' + rate + '%\n';
-    csv += 'Time Period,' + time + ' years\n\n';
+    csv += 'Time,' + time + ' Years, Compounding ' + compoundingFreq + '\n';
     
-    csv += 'RESULTS SUMMARY\n';
-    csv += 'Total Invested,' + totalContributions.toFixed(2) + '\n';
-    csv += 'Interest Earned,' + totalInterest.toFixed(2) + '\n';
-    csv += 'Final Amount,' + totalAmount.toFixed(2) + '\n\n';
-    
-    csv += 'YEAR-BY-YEAR GROWTH\n';
-    csv += 'Year,Total Invested,Interest Earned,Final Amount\n';
-    
+    // Add step-up info if applicable
+    const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
+    if (stepupPercentage > 0) {
+        csv += 'Step-up Percentage,' + stepupPercentage + '% yearly\n';
+    }
+    csv += '\n';
+
+    csv += 'Results Summary\n';
+    csv += 'Total Invested,' + sanitizeNumberForCSV(totalContributions) + '\n';
+    csv += 'Interest Earned,' + sanitizeNumberForCSV(totalInterest) + '\n';
+    csv += 'Final Amount,' + sanitizeNumberForCSV(totalAmount) + '\n\n';
+
+    csv += 'Growth Summary\n';
+    csv += 'Year,Total Invested,Interest This Year,Total Interest,Total Amount\n';
+
+    // Include ALL growth data points
     for (let i = 0; i < growthData.length; i++) {
         const item = growthData[i];
-        csv += item.year + ',' + 
-               item.contributions.toFixed(2) + ',' + 
-               item.interest.toFixed(2) + ',' + 
-               item.totalAmount.toFixed(2) + '\n';
+        const interestThisYear = item.interest - (growthData[i - 1]?.interest || 0);
+        csv += item.year + ',' +
+               sanitizeNumberForCSV(item.contributions) + ',' +
+               sanitizeNumberForCSV(interestThisYear) + ',' +
+               sanitizeNumberForCSV(item.interest) + ',' +
+               sanitizeNumberForCSV(item.totalAmount) + '\n';
     }
-    
-    // Force download using the old-school method
+
     const filename = 'investment_report_' + new Date().toISOString().split('T')[0] + '.csv';
-    
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
     element.setAttribute('download', filename);
     element.style.display = 'none';
-    
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    
-    // Hide options after download
+
     toggleDownloadOptions();
 }
 
-
-
+// FIXED: Download PDF function with proper frequency display and complete data
 function downloadPDF() {
     if (!currentCalculationData) {
         alert('Please calculate results first');
         return;
     }
-    
+
     const { principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData } = currentCalculationData;
-    
-    // Create new PDF document
+
+    // Get proper frequency labels from actual form values
+    const compoundingFreq = getFrequencyText(parseInt(document.getElementById('compoundingFrequency').value));
+    const sipFreq = getFrequencyText(parseInt(document.getElementById('paymentFrequency').value));
+    const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    
-    // Title
-    doc.setFontSize(20);
+
+    doc.setFontSize(18);
     doc.setFont(undefined, 'bold');
-    doc.text('Investment Calculator Report', 20, 25);
-    
-    // Date
+    doc.text('Investment Report', 20, 25);
+
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text('Generated on: ' + new Date().toLocaleDateString(), 20, 35);
-    
+    doc.text('Generated on: ' + new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), 20, 35);
+
     // Input Parameters
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('INPUT PARAMETERS', 20, 50);
-    
+    doc.text('Input Parameters', 20, 50);
+
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
-    doc.text('Initial Amount: ' + formatCurrency(principal), 20, 60);
-    doc.text('SIP Amount: ' + formatCurrency(sipAmount), 20, 68);
-    doc.text('Annual Return: ' + rate + '%', 20, 76);
-    doc.text('Time Period: ' + time + ' years', 20, 84);
-    
+    let yPos = 60;
+    doc.text('Lump Sum: ' + formatCurrency(principal), 20, yPos);
+    yPos += 8;
+    doc.text('SIP Amount: ' + formatCurrency(sipAmount) +' '+ sipFreq, 20, yPos);
+    yPos += 8;
+    doc.text('Annual Return: ' + rate + '%', 20, yPos);
+    yPos += 8;
+    doc.text('Time: ' + time + ' Years, Compounding '+ compoundingFreq, 20, yPos);
+
+    if (stepupPercentage > 0) {
+        yPos += 8;
+        doc.text('Step-up: ' + stepupPercentage + '% yearly', 20, yPos);
+    }
+
     // Results Summary
+    yPos += 20;
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('RESULTS SUMMARY', 20, 100);
-    
+    doc.text('Results Summary', 20, yPos);
+
+    yPos += 10;
     doc.setFontSize(11);
     doc.setFont(undefined, 'normal');
-    doc.text('Total Invested: ' + formatCurrency(totalContributions), 20, 110);
-    doc.text('Interest Earned: ' + formatCurrency(totalInterest), 20, 118);
-    doc.text('Final Amount: ' + formatCurrency(totalAmount), 20, 126);
-    
-    // Year-by-year table (simplified)
+    doc.text('Total Invested: ' + formatCurrency(totalContributions), 20, yPos);
+    yPos += 8;
+    doc.text('Total Interest Earned: ' + formatCurrency(totalInterest), 20, yPos);
+    yPos += 8;
+    doc.text('Final Amount: ' + formatCurrency(totalAmount), 20, yPos);
+
+    // Growth Summary Table
+    yPos += 20;
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('GROWTH SUMMARY', 20, 142);
-    
+    doc.text('Growth Summary', 20, yPos);
+
+    yPos += 10;
     doc.setFontSize(9);
     doc.setFont(undefined, 'normal');
-    
-    let yPosition = 152;
-    doc.text('Year    Invested       Interest      Total', 20, yPosition);
-    yPosition += 8;
-    
-    // Show every 5th year to fit on page
-    for (let i = 0; i < growthData.length; i += Math.max(1, Math.floor(growthData.length / 10))) {
-        const item = growthData[i];
-        const line = item.year.toString().padEnd(8) + 
-                    formatCurrency(item.contributions).padEnd(15) + 
-                    formatCurrency(item.interest).padEnd(15) + 
-                    formatCurrency(item.totalAmount);
-        doc.text(line, 20, yPosition);
-        yPosition += 6;
+
+    // Column headers
+    doc.text('Year', 20, yPos);
+    doc.text('Invested', 40, yPos);
+    doc.text('Interest This Year', 75, yPos);
+    doc.text('Total Interest', 115, yPos);
+    doc.text('Total Amount', 150, yPos);
+
+    yPos += 8;
+
+    // Show ALL growth data, handle page breaks
+    for (let i = 0; i < growthData.length; i++) {
+        // Check if we need a new page
+        if (yPos > 270) {
+            doc.addPage();
+            yPos = 20;
+            
+            // Repeat headers on new page
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.text('Year', 20, yPos);
+            doc.text('Invested', 40, yPos);
+            doc.text('Interest This Year', 75, yPos);
+            doc.text('Total Interest', 115, yPos);
+            doc.text('Total Amount', 150, yPos);
+            yPos += 8;
+        }
         
-        if (yPosition > 270) break; // Don't exceed page
+        const item = growthData[i];
+        const interestThisYear = item.interest - (growthData[i - 1]?.interest || 0);
+        
+        // Format numbers to fit in columns
+        const formatForPDF = (amount) => {
+            const formatted = formatCurrency(amount);
+            if (formatted.length > 12) {
+                // Truncate long numbers for PDF display
+                if (currentCurrency === 'INR') {
+                    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(1)}Cr`;
+                    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+                } else {
+                    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+                    if (amount >= 1000) return `$${(amount / 1000).toFixed(1)}K`;
+                }
+            }
+            return formatted;
+        };
+        
+        doc.text(item.year.toString(), 20, yPos);
+        doc.text(formatForPDF(item.contributions), 40, yPos);
+        doc.text(formatForPDF(interestThisYear), 75, yPos);
+        doc.text(formatForPDF(item.interest), 115, yPos);
+        doc.text(formatForPDF(item.totalAmount), 150, yPos);
+        yPos += 6;
     }
-    
+
     // Footer
     doc.setFontSize(8);
     doc.text('Generated by Investment Calculator App', 20, 285);
-    
-    // Download
+
     const filename = 'investment_report_' + new Date().toISOString().split('T')[0] + '.pdf';
     doc.save(filename);
-    
-    // Hide options after download
+
     toggleDownloadOptions();
+}
+
+
+function clearSipHistory() {
+    sipHistoryData = [];
+    updateSipHistoryDisplay();
+    
+    // Optionally close the dropdown after clearing
+    document.getElementById('sipHistoryDropdown').style.display = 'none';
+    document.querySelector('.sip-saved-button').textContent = '📊 Saved';
 }
 
 
@@ -1592,37 +1655,28 @@ function formatCurrencyPlain(amount) {
     return parseFloat(amount).toFixed(2);
 }
 
-
-// Currency formatting functions
 function formatCurrencyINR(amount) {
-    const numStr = amount.toString();
-    const [whole, decimal] = numStr.split('.');
-    
+    amount = parseFloat(amount).toFixed(2);
+    const [whole, decimal] = amount.split('.');
+
     if (whole.length <= 3) {
-        return `₹${numStr}`;
+        return `₹${whole}${decimal ? '.' + decimal : ''}`;
     }
-    
+
     const lastThree = whole.slice(-3);
-    const rest = whole.slice(0, -3);
-    
-    let formatted = '';
-    for (let i = rest.length; i > 0; i -= 2) {
-        const start = Math.max(0, i - 2);
-        formatted = ',' + rest.slice(start, i) + formatted;
-    }
-    
-    const result = `₹${formatted.slice(1)}${formatted ? ',' : ''}${lastThree}`;
-    return decimal ? `${result}.${decimal}` : result;
+    let rest = whole.slice(0, -3);
+    rest = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+
+    return `₹${rest},${lastThree}${decimal ? '.' + decimal : ''}`;
 }
 
 function formatCurrencyUSD(amount) {
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `$${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatCurrency(amount) {
     if (currentCurrency === 'INR') {
-        const formatted = amount.toFixed(2);
-        return formatCurrencyINR(formatted);
+        return formatCurrencyINR(amount);
     } else {
         return formatCurrencyUSD(amount);
     }
@@ -1729,7 +1783,16 @@ function calc_toggleSign() {
         calc_updateDisplay();
     }
 }
-
+function getFrequencyText(frequency) {
+    switch(parseInt(frequency)) {
+        case 12: return 'Monthly';
+        case 4: return 'Quarterly';  
+        case 2: return 'Semi-annually';
+        case 1: return 'Annually';
+        case 365: return 'Daily';
+        default: return 'Monthly';
+    }
+}
 // Calculator - Square Root Function
 function calc_calculateSquareRoot() {
     if (calc_currentInput && calc_currentInput !== '0') {
@@ -1768,7 +1831,7 @@ function toggleSipHistory() {
 }
 
 
-function saveSipCalculation(principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData) {
+function saveSipCalculation(principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, frequency, sipfrequency, growthData) {
     // Get step-up percentage when saving
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
     
@@ -1778,10 +1841,12 @@ function saveSipCalculation(principal, sipAmount, rate, time, totalAmount, total
         sipAmount: sipAmount,
         rate: rate,
         time: time,
+        frequency: getFrequencyText(frequency),
+        sipfrequency: sipfrequency,
         totalAmount: totalAmount,
         totalContributions: totalContributions,
         totalInterest: totalInterest,
-        growthData: growthData
+        growthData: growthData || []
     };
 
     // Check if this exact calculation already exists (including step-up)
@@ -1815,12 +1880,11 @@ function saveSipCalculation(principal, sipAmount, rate, time, totalAmount, total
         updateSipHistoryDisplay();
     }
 }
-
 function updateSipHistoryDisplay() {
     const historyList = document.getElementById('sipHistoryList');
     
     if (sipHistoryData.length === 0) {
-        historyList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 12px;">No saved calculations yet</div>';
+        historyList.innerHTML = '<div style="text-align: center; color: var(--text-secondary); font-size: 13px; padding: 12px;">No History</div>';
     } else {
         historyList.innerHTML = sipHistoryData
             .map(item => {
@@ -2069,7 +2133,7 @@ function calculateCompoundInterest() {
     const time = parseFloat(document.getElementById('timePeriod').value);
     const frequency = parseInt(document.getElementById('compoundingFrequency').value);
     const sipAmount = parseFloat(document.getElementById('recurringPayment').value) || 0;
-    const sipFrequency = parseInt(document.getElementById('paymentFrequency').value);
+    const sipfrequency = parseInt(document.getElementById('paymentFrequency').value);
     
     // Get step-up percentage
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
@@ -2100,7 +2164,7 @@ function calculateCompoundInterest() {
     if (sipAmount > 0) {
         // SIP calculation with step-up support
         let currentAmount = principal;
-        const sipPeriodsPerYear = sipFrequency;
+        const sipPeriodsPerYear = sipfrequency;
         const compoundingPeriodsPerYear = frequency;
         
         // Calculate growth data year by year
@@ -2265,10 +2329,9 @@ function calculateCompoundInterest() {
         console.error('Chart creation error:', error);
     }
     
-    // Simple direct call - no conditional logic
-    saveSipCalculation(principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, growthData);
+    // FIXED: Corrected function call with proper parameters
+    saveSipCalculation(principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, frequency, getFrequencyText(sipfrequency), growthData);
 }
-
 
 function createCompoundChart(principal, interest) {
     const canvas = document.getElementById('compoundChart');
@@ -2328,10 +2391,12 @@ function createCompoundChart(principal, interest) {
     }
 }
 
-// IMPROVED Growth Chart Function with Consistent Line Styling
 function createGrowthChart(growthData) {
     const canvas = document.getElementById('growthChart');
     if (!canvas || !growthData || growthData.length === 0) return;
+
+    // Increase container height slightly
+    canvas.parentElement.style.height = (canvas.parentElement.offsetHeight + 3) + "px";
     
     const ctx = canvas.getContext('2d');
     
@@ -2343,7 +2408,6 @@ function createGrowthChart(growthData) {
     try {
         const sipAmount = parseFloat(document.getElementById('recurringPayment').value) || 0;
         
-        // Create simple numeric labels starting from 0: 0, 1, 2, 3...
         const labels = growthData.map(item => item.year.toString());
         const totalAmounts = growthData.map(item => item.totalAmount);
         const contributions = growthData.map(item => item.contributions);
@@ -2354,13 +2418,13 @@ function createGrowthChart(growthData) {
                 labels: labels,
                 datasets: [
                     {
-                        label: 'Final Amount',
+                        label: 'Total Amount',
                         data: totalAmounts,
-                        borderColor: '#1a73e8',
-                        backgroundColor: 'rgba(26, 115, 232, 0.1)',
-                        fill: false,
+                        borderColor: '#34a853',
+                        backgroundColor: 'rgba(52, 168, 83, 0.1)',
+                        fill: true,
                         tension: 0,
-                        pointBackgroundColor: '#1a73e8',
+                        pointBackgroundColor: '#34a853',
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                         pointRadius: 3,
@@ -2370,11 +2434,11 @@ function createGrowthChart(growthData) {
                     {
                         label: 'Invested Amount',
                         data: contributions,
-                        borderColor: '#34a853',
-                        backgroundColor: 'rgba(52, 168, 83, 0.1)',
-                        fill: false,
+                        borderColor: '#1a73e8',
+                        backgroundColor: 'rgba(26, 115, 232, 0.1)',
+                        fill: true,
                         tension: 0,
-                        pointBackgroundColor: '#34a853',
+                        pointBackgroundColor: '#1a73e8',
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                         pointRadius: 3,
@@ -2384,17 +2448,19 @@ function createGrowthChart(growthData) {
                 ]
             },
             options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: {
-        padding: {
-            bottom: 12
-        }
-    },
-    interaction: {
-        intersect: false,
-        mode: 'index'
-    },
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 2,  // increased graph area on left by 2px
+                        bottom: 10,
+                        top: 2 // increased graph area bottom by 1px (was 12)
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
                 plugins: {
                     legend: {
                         display: true,
@@ -2407,31 +2473,31 @@ function createGrowthChart(growthData) {
                             usePointStyle: true,
                             boxWidth: 8,
                             boxHeight: 8,
-                            padding: 10
+                            padding: 4
                         }
                     },
                     tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleColor: '#ffffff',
-                    bodyColor: '#ffffff',
-                    borderColor: '#666',
-                    borderWidth: 1,
-                    cornerRadius: 6,
-                    titleFont: {
-                        size: 12,  /* reduced from 14 */
-                        weight: 'bold'
-                    },
-                    bodyFont: {
-                        size: 11   /* reduced from 13 */
-                    },
-                    padding: 12,       /* reduced from 18 */
-                    boxPadding: 3,     /* reduced from 5 */
-                    displayColors: true,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#666',
+                        borderWidth: 1,
+                        cornerRadius: 6,
+                        titleFont: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 12,
+                        boxPadding: 3,
+                        displayColors: true,
                         callbacks: {
                             title: function(tooltipItems) {
                                 if (tooltipItems.length > 0) {
-                                    const label = tooltipItems[0].label;
-                                    return `${label} Year(s)`;
+                                    const year = parseInt(tooltipItems[0].label);
+                                    return year === 1 ? `After 1 Year` : `After ${year} Years`;
                                 }
                                 return '';
                             },
@@ -2443,8 +2509,14 @@ function createGrowthChart(growthData) {
                             afterBody: function(tooltipItems) {
                                 if (tooltipItems.length > 0) {
                                     const dataIndex = tooltipItems[0].dataIndex;
-                                    const interestEarned = growthData[dataIndex].interest;
-                                    return [`Interest Earned: ${formatCurrency(interestEarned)}`];
+                                    const year = growthData[dataIndex].year;
+                                    const totalInterest = growthData[dataIndex].interest;
+                                    const prevTotalInterest = dataIndex > 0 ? growthData[dataIndex - 1].interest : 0;
+                                    const yearlyInterest = totalInterest - prevTotalInterest;
+                                    return [
+                                        `Interest Earned: ${formatCurrency(totalInterest)}`,
+                                        `${year}th Year Interest: ${formatCurrency(yearlyInterest)}`
+                                    ];
                                 }
                                 return [];
                             }
@@ -2462,7 +2534,7 @@ function createGrowthChart(growthData) {
                                 size: 12,
                                 weight: 'bold'
                             },
-                            padding: 8,
+                            padding: 0, // reduced to push graph left
                             maxRotation: 0,
                             minRotation: 0
                         },
@@ -2472,7 +2544,8 @@ function createGrowthChart(growthData) {
                             font: {
                                 size: 13,
                                 weight: 'bold'
-                            }
+                            },
+                            padding: {top: 0}
                         }
                     },
                     y: {
@@ -2484,7 +2557,7 @@ function createGrowthChart(growthData) {
                                 size: 12,
                                 weight: 'bold'
                             },
-                            padding: 8,
+                            padding: 4,
                             callback: function(value) {
                                 if (currentCurrency === 'INR') {
                                     if (value >= 10000000) {
@@ -2496,7 +2569,7 @@ function createGrowthChart(growthData) {
                                     } else {
                                         return `₹${value}`;
                                     }
-                                    } else {
+                                } else {
                                     if (value >= 1000000) {
                                         return `$${(value / 1000000).toFixed(1)}M`;
                                     } else if (value >= 1000) {
@@ -2513,7 +2586,8 @@ function createGrowthChart(growthData) {
                             font: {
                                 size: 13,
                                 weight: 'bold'
-                            }
+                            },
+                            padding: {bottom: 0}
                         }
                     }
                 },
@@ -2523,11 +2597,12 @@ function createGrowthChart(growthData) {
                 }
             }
         });
-        
+
     } catch (error) {
         console.error('Growth chart creation failed:', error);
     }
 }
+
 
 function updatePercentageDisplay(principal, interest) {
     const total = principal + interest;
