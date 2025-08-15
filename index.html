@@ -96,7 +96,7 @@
 
 /* Download Section */
 .download-section {
-    margin-top: 10px;     /* Added padding above to separate from graph */
+    margin-top: 14px;     /* Added padding above to separate from graph */
     margin-bottom: 16px;
     width: 350px;
 }
@@ -182,10 +182,18 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     padding: 20px;
+    padding-top: 30px;
     transition: all 0.15s ease;
+}
+
+@media (min-width: 1024px) {
+    body {
+        align-items: center;
+        padding-top: 20px;
+    }
 }
 
 .theme-toggle {
@@ -837,7 +845,7 @@ font-weight: 600;
     padding: 10px;
     border: 1px solid var(--border);
     box-shadow: 0 2px 8px var(--shadow);
-    margin-top: -2px;
+    margin-top: -4px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -860,14 +868,14 @@ font-weight: 600;
     width: 144px;
     height: 170px;
     position: relative;
-    margin-bottom: 2px;
+    margin-bottom: 0px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .chart-percentage-display {
-    margin-top: -35px; /* increased negative margin from -35px - moves text up */
+    margin-top: -32px; /* increased negative margin from -35px - moves text up */
     background: transparent;
     border: none;
     border-radius: 0;
