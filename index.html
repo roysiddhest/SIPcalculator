@@ -97,20 +97,20 @@
 /* Download Section */
 .download-section {
     margin-top: 12px;     /* Added padding above to separate from graph */
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     width: 350px;
 }
 
 @media (max-width: 768px) {
     .download-section {
-        margin-top: 26px;  /* increased margin for mobile */
+        margin-top: 30px;  /* increased margin for mobile */
     }
 }
 
 
 .download-toggle {
     width: 100%;
-    height: 38px;         /* Reduced from 42px to make it smaller */
+    height: 40px;         /* Reduced from 42px to make it smaller */
     background: linear-gradient(45deg, #1a73e8, #4285f4);
     color: white;
     border: none;
@@ -846,7 +846,7 @@ font-weight: 600;
 .chart-container {
     position: relative;
     width: 350px;
-    height: 180px;
+    height: 180px; /* default height for laptop */
     background: var(--bg-primary);
     border-radius: 12px;
     padding: 10px;
@@ -869,6 +869,13 @@ font-weight: 600;
     -moz-background-clip: padding;
     background-clip: padding-box;
 }
+
+@media (max-width: 768px) {
+    .chart-container {
+        height: 175px; /* increased height for mobile */
+    }
+}
+
 
 .chart-wrapper {
     margin-top: 0px; /* shifted up by 2px */
@@ -922,7 +929,7 @@ font-weight: 600;
 .growth-graph-container {
     position: relative;
     width: 350px;
-    height: 300px; /* reduced by 10% from 324px */
+    height: 290px; /* reduced by 10% from 324px */
     background: var(--bg-primary);
     border-radius: 12px;
     padding: 10px;
@@ -941,6 +948,13 @@ font-weight: 600;
     -moz-background-clip: padding;
     background-clip: padding-box;
 }
+
+@media (max-width: 768px) {
+    .growth-graph-container {
+        height: 310px; /* increased height for mobile */
+    }
+}
+
 
 .growth-chart-wrapper {
     width: 100%;
