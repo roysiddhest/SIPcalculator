@@ -831,10 +831,10 @@ font-weight: 600;
 .chart-container {
     position: relative;
     width: 350px;
-    height: 195px;
+    height: 188px;
     background: var(--bg-primary);
     border-radius: 12px;
-    padding: 16px;
+    padding: 12px;
     border: 1px solid var(--border);
     box-shadow: 0 2px 8px var(--shadow);
     display: flex;
@@ -924,16 +924,6 @@ font-weight: 600;
     -webkit-background-clip: padding-box;
     -moz-background-clip: padding;
     background-clip: padding-box;
-}
-
-.growth-graph-title {
-    font-size: 12px;
-    font-weight: 550;
-    color: var(--text-secondary);
-    text-align: center;
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .growth-chart-wrapper {
@@ -1284,8 +1274,8 @@ font-weight: 600;
 <!-- Step-up SIP input field -->
 <div class="stepup-input-section" id="stepupInputSection" style="display: none;">
     <div class="form-group">
-        <label for="stepupPercentage">Yearly Step-up %</label>
-        <input id="stepupPercentage" min="0" max="50" placeholder="e.g., 10" step="1" type="number"/>
+        <label for="stepupPercentage">Yearly Increase in SIP</label>
+        <input id="stepupPercentage" min="0" max="50" placeholder="%" step="1" type="number"/>
     </div>
 </div>
 
@@ -1312,7 +1302,6 @@ font-weight: 600;
 <div class="chart-percentage-display" id="chartPercentages"></div>
 </div>
 <div class="growth-graph-container">
-<div class="growth-graph-title">Interactive Growth Chart</div>
 <div class="growth-chart-wrapper">
 <canvas id="growthChart"></canvas>
 </div>
@@ -1351,28 +1340,27 @@ font-weight: 600;
     <button class="calc-btn clear" onclick="calc_clearAll()">C</button>
     <button class="calc-btn" onclick="calc_clearEntry()">CE</button>
     <button class="calc-btn" onclick="calc_backspace()">⌫</button>
-    <button class="calc-btn calc_operator" onclick="calc_appendOperator('/')">÷</button>
+    <button class="calc-btn calc_operator" onclick="calc_calculateSquareRoot()">√</button>
     
     <button class="calc-btn" onclick="calc_appendNumber('7')">7</button>
     <button class="calc-btn" onclick="calc_appendNumber('8')">8</button>
     <button class="calc-btn" onclick="calc_appendNumber('9')">9</button>
-    <button class="calc-btn calc_operator" onclick="calc_appendOperator('*')">×</button>
+    <button class="calc-btn calc_operator" onclick="calc_appendOperator('/')">÷</button>
     
     <button class="calc-btn" onclick="calc_appendNumber('4')">4</button>
     <button class="calc-btn" onclick="calc_appendNumber('5')">5</button>
     <button class="calc-btn" onclick="calc_appendNumber('6')">6</button>
-    <button class="calc-btn calc_operator" onclick="calc_appendOperator('-')">−</button>
+    <button class="calc-btn calc_operator" onclick="calc_appendOperator('*')">×</button>
     
     <button class="calc-btn" onclick="calc_appendNumber('1')">1</button>
     <button class="calc-btn" onclick="calc_appendNumber('2')">2</button>
     <button class="calc-btn" onclick="calc_appendNumber('3')">3</button>
-    <button class="calc-btn calc_operator" onclick="calc_appendOperator('+')">+</button>
+    <button class="calc-btn calc_operator" onclick="calc_appendOperator('-')">−</button>
     
     <button class="calc-btn" onclick="calc_appendDecimal()">.</button>
     <button class="calc-btn" onclick="calc_appendNumber('0')">0</button>
     <button class="calc-btn" onclick="calc_toggleSign()">+/−</button>
-    <button class="calc-btn" onclick="calc_calculateSquareRoot()">√</button>
-
+    <button class="calc-btn calc_operator" onclick="calc_appendOperator('+')">+</button>
     
     <button class="calc-btn equals" onclick="calc_calculateResult()" style="grid-column: span 4;">=</button>
 </div>
@@ -1408,6 +1396,34 @@ function toggleSipOptions() {
         stepupSection.style.display = 'none';
     }
 }
+function getTotalPeriodsUpToYear(year, paymentFrequency, stepupPercentage, sipAmount) {
+    let periodsPerYear;
+
+    switch (paymentFrequency) {
+        case 1: periodsPerYear = 1; break;   // Yearly
+        case 2: periodsPerYear = 2; break;   // Half-yearly
+        case 4: periodsPerYear = 4; break;   // Quarterly
+        case 12: periodsPerYear = 12; break; // Monthly
+        default: periodsPerYear = 1; break;
+    }
+
+    let totalPeriods = 0;
+    let sip = sipAmount;
+
+    // Add SIP for each full year with step-up applied yearly
+    for (let i = 0; i < Math.floor(year); i++) {
+        totalPeriods += periodsPerYear;
+        sip *= (1 + (stepupPercentage / 100)); 
+    }
+
+    // Add partial year periods
+    const fractionalPart = year % 1;
+    if (fractionalPart > 0) {
+        totalPeriods += periodsPerYear * fractionalPart;
+    }
+
+    return totalPeriods;
+}
 
 
 // Simplified Step-Up toggle - no dropdown needed
@@ -1431,7 +1447,7 @@ function toggleDownloadOptions() {
     
     if (options.style.display === 'none') {
         options.style.display = 'flex';
-        button.textContent = '📥 Hide Options';
+        button.textContent = '📥 Close';
     } else {
         options.style.display = 'none';
         button.textContent = '📥 Download Report';
@@ -1474,7 +1490,7 @@ function downloadCSV() {
     // Add step-up info if applicable
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
     if (stepupPercentage > 0) {
-        csv += 'Step-up Percentage,' + stepupPercentage + '% yearly\n';
+        csv += 'Step-Up SIP,' + stepupPercentage + '% Yearly\n';
     }
     csv += '\n';
 
@@ -1558,7 +1574,7 @@ function downloadPDF() {
 
     if (stepupPercentage > 0) {
         yPos += 8;
-        doc.text('Step-up: ' + stepupPercentage + '% yearly', 20, yPos);
+        doc.text('Step-Up SIP: ' + stepupPercentage + '% Yearly', 20, yPos);
     }
 
     // Results Summary
@@ -1949,6 +1965,7 @@ function loadSipCalculation(index) {
     
     // Close the dropdown
     document.getElementById('sipHistoryDropdown').style.display = 'none';
+    document.querySelector('.sip-saved-button').textContent = '📊 Saved';
 }
 
 
@@ -2143,11 +2160,10 @@ function calculateCompoundInterest() {
     const principal = parseFloat(document.getElementById('principal').value) || 0;
     const rate = parseFloat(document.getElementById('interestRate').value);
     const time = parseFloat(document.getElementById('timePeriod').value);
-    const frequency = parseInt(document.getElementById('compoundingFrequency').value);
+    const frequency = parseInt(document.getElementById('compoundingFrequency').value) || 1;
     const sipAmount = parseFloat(document.getElementById('recurringPayment').value) || 0;
-    const sipfrequency = parseInt(document.getElementById('paymentFrequency').value);
+    const sipfrequency = parseInt(document.getElementById('paymentFrequency').value) || 1;
     
-    // Get step-up percentage
     const stepupPercentage = parseFloat(document.getElementById('stepupPercentage').value) || 0;
     const isStepUpEnabled = stepupPercentage > 0;
     
@@ -2165,110 +2181,79 @@ function calculateCompoundInterest() {
     }
     
     let totalAmount = 0;
-    let totalContributions = principal;
+    let totalContributions = 0;
     let totalInterest = 0;
     let growthData = [];
-    
+
     const annualRate = rate / 100;
-    const compoundingRate = annualRate / frequency;
-    const totalPeriods = time * frequency;
-    
+
     if (sipAmount > 0) {
-        // SIP calculation with step-up support
+        // ✅ SIP calculation with correct handling for decimal years
         let currentAmount = principal;
-        const sipPeriodsPerYear = sipfrequency;
-        const compoundingPeriodsPerYear = frequency;
-        
-        // Calculate growth data year by year
-        for (let year = 0; year <= time; year++) {
-            if (year === 0) {
-                // Initial year data
-                growthData.push({
-                    year: year,
-                    totalAmount: principal,
-                    contributions: principal,
-                    interest: 0
-                });
-                continue;
+        let currentSip = sipAmount;
+        const periodsPerYear = frequency;        // compounding frequency
+        const sipPeriodsPerYear = sipfrequency;  // SIP deposits per year
+
+        growthData = [];
+
+        const fullYears = Math.floor(time);
+        const remainder = time - fullYears;
+
+        // Year 0 snapshot
+        growthData.push({
+            year: 0,
+            totalAmount: currentAmount,
+            contributions: principal,
+            interest: 0
+        });
+
+        // Full years
+        for (let y = 1; y <= fullYears; y++) {
+            for (let p = 0; p < sipPeriodsPerYear; p++) {
+                // deposit then compound until next deposit
+                currentAmount += currentSip;
+                currentAmount *= Math.pow(1 + annualRate / periodsPerYear, periodsPerYear / sipPeriodsPerYear);
             }
-            
-            // Calculate current year's SIP amount with step-up
-            let currentYearSipAmount = sipAmount;
-            if (isStepUpEnabled && year > 1) {
-                // Apply step-up from year 2 onwards
-                const stepUpMultiplier = Math.pow(1 + (stepupPercentage / 100), year - 1);
-                currentYearSipAmount = sipAmount * stepUpMultiplier;
+            if (isStepUpEnabled) {
+                currentSip += (currentSip * stepupPercentage) / 100;
             }
-            
-            // Reset for this year's calculation
-            let yearStartAmount = year === 1 ? principal : currentAmount;
-            let yearContributions = 0;
-            
-            // For partial years (e.g., 2.5 years), handle the fractional part
-            const isPartialYear = year === Math.ceil(time) && time % 1 !== 0;
-            const yearFraction = isPartialYear ? time % 1 : 1;
-            
-            // Calculate SIP payments for this year
-            const sipPaymentsThisYear = Math.floor(sipPeriodsPerYear * yearFraction);
-            yearContributions = sipPaymentsThisYear * currentYearSipAmount;
-            
-            // Method: Calculate future value of existing amount + future value of annuity
-            let yearEndAmount = 0;
-            
-            if (yearFraction === 1) {
-                // Full year calculation
-                // Future value of existing amount
-                yearEndAmount = yearStartAmount * Math.pow(1 + compoundingRate, compoundingPeriodsPerYear);
-                
-                // Future value of SIP payments (annuity) with step-up amount
-                if (currentYearSipAmount > 0) {
-                    const periodsPerSipPayment = compoundingPeriodsPerYear / sipPeriodsPerYear;
-                    
-                    for (let sipPayment = 1; sipPayment <= sipPeriodsPerYear; sipPayment++) {
-                        const periodsToCompound = compoundingPeriodsPerYear - ((sipPayment - 1) * periodsPerSipPayment);
-                        yearEndAmount += currentYearSipAmount * Math.pow(1 + compoundingRate, periodsToCompound);
-                    }
-                }
-            } else {
-                // Partial year calculation
-                const partialPeriods = compoundingPeriodsPerYear * yearFraction;
-                yearEndAmount = yearStartAmount * Math.pow(1 + compoundingRate, partialPeriods);
-                
-                // Add SIP payments with appropriate compounding
-                if (currentYearSipAmount > 0) {
-                    const periodsPerSipPayment = compoundingPeriodsPerYear / sipPeriodsPerYear;
-                    
-                    for (let sipPayment = 1; sipPayment <= sipPaymentsThisYear; sipPayment++) {
-                        const periodsToCompound = partialPeriods - ((sipPayment - 1) * periodsPerSipPayment);
-                        if (periodsToCompound > 0) {
-                            yearEndAmount += currentYearSipAmount * Math.pow(1 + compoundingRate, periodsToCompound);
-                        } else {
-                            yearEndAmount += currentYearSipAmount;
-                        }
-                    }
-                }
-            }
-            
-            currentAmount = yearEndAmount;
-            totalContributions += yearContributions;
-            
-            const currentInterest = currentAmount - totalContributions;
-            
+
+            const contributionsSoFar = principal + (sipAmount * sipPeriodsPerYear * y);
+            const interestEarned = currentAmount - contributionsSoFar;
+
             growthData.push({
-                year: year,
+                year: y,
                 totalAmount: currentAmount,
-                contributions: totalContributions,
-                interest: currentInterest,
-                yearlyContribution: yearContributions,
-                sipAmount: currentYearSipAmount // Track SIP amount for this year
+                contributions: contributionsSoFar,
+                interest: interestEarned
             });
         }
-        
+
+        // Partial year (if any)
+        if (remainder > 0) {
+            const partialDeposits = Math.floor(remainder * sipPeriodsPerYear + 1e-9); // deposits that occur in the remainder
+            for (let p = 0; p < partialDeposits; p++) {
+                currentAmount += currentSip;
+                currentAmount *= Math.pow(1 + annualRate / periodsPerYear, periodsPerYear / sipPeriodsPerYear);
+            }
+            // leftover time after the last partial deposit until exact 'time'
+            const leftoverYears = remainder - (partialDeposits / sipPeriodsPerYear);
+            if (leftoverYears > 0) {
+                currentAmount *= Math.pow(1 + annualRate / periodsPerYear, periodsPerYear * leftoverYears);
+            }
+        }
+
         totalAmount = currentAmount;
+        // keep your existing contribution formula
+        totalContributions = principal + (sipAmount * sipPeriodsPerYear * time);
         totalInterest = totalAmount - totalContributions;
-        
+
     } else {
-        // Simple compound interest for lump sum only (no step-up needed)
+        // ✅ Lump sum only
+        const compoundingRate = annualRate / frequency;
+        const totalPeriods = time * frequency;
+
+        growthData = [];
         for (let year = 0; year <= time; year++) {
             let amount;
             if (year === 0) {
@@ -2281,9 +2266,7 @@ function calculateCompoundInterest() {
             } else {
                 break;
             }
-            
             const interestEarned = amount - principal;
-            
             growthData.push({
                 year: year,
                 totalAmount: amount,
@@ -2291,28 +2274,25 @@ function calculateCompoundInterest() {
                 interest: interestEarned
             });
         }
-        
-        const exactPeriods = frequency * time;
-        totalAmount = principal * Math.pow(1 + compoundingRate, exactPeriods);
+
+        totalAmount = principal * Math.pow(1 + compoundingRate, totalPeriods);
         totalContributions = principal;
         totalInterest = totalAmount - principal;
     }
-    
+
     const totalReturn = totalContributions > 0 ? (totalInterest / totalContributions) * 100 : 0;
-    
+
     const resultsContainer = document.getElementById('compoundResults');
-    if (!resultsContainer) {
-        return;
-    }
-    
-    // Add step-up info to results display if enabled
+    if (!resultsContainer) return;
+
     let stepUpInfo = '';
-    if (isStepUpEnabled && sipAmount > 0) {
-        stepUpInfo = `<div class="result-note" style="font-size: 14px; color: var(--text-secondary); text-align: center; margin-top: 7px;">
-            📈 STEP-UP: ${stepupPercentage}% YEARLY INCREASE IN SIP
-        </div>`;
-    }
-    
+if (isStepUpEnabled && sipAmount > 0) {
+    stepUpInfo = `<div class="result-note" style="font-size: 12px; color: var(--text-secondary); text-align: center; margin-top: 6px;">
+        <b>📈 STEP-UP SIP: ${stepupPercentage}% YEARLY INCREASE</b>
+    </div>`;
+}
+
+
     resultsContainer.innerHTML = `
     <div class="result-card" style="background: linear-gradient(135deg, #e8f4f8, #a7f0ff);">
         <div class="result-label">Total Invested</div>
@@ -2328,22 +2308,27 @@ function calculateCompoundInterest() {
     </div>
     ${stepUpInfo}
     `;
-    
+
     const rightPanel = document.getElementById('sipRightPanel');
     if (rightPanel) {
         rightPanel.classList.add('show');
     }
-    
+
     try {
         createCompoundChart(totalContributions, totalInterest);
         createGrowthChart(growthData);
     } catch (error) {
         console.error('Chart creation error:', error);
     }
-    
-    // FIXED: Corrected function call with proper parameters
-    saveSipCalculation(principal, sipAmount, rate, time, totalAmount, totalContributions, totalInterest, frequency, getFrequencyText(sipfrequency), growthData);
+
+    saveSipCalculation(
+        principal, sipAmount, rate, time, totalAmount,
+        totalContributions, totalInterest, frequency,
+        getFrequencyText(sipfrequency), growthData
+    );
 }
+
+
 
 function createCompoundChart(principal, interest) {
     const canvas = document.getElementById('compoundChart');
@@ -2356,7 +2341,9 @@ function createCompoundChart(principal, interest) {
         chartInstance = null;
     }
     
-    const principalAmount = parseFloat(principal) || 0;
+    // Include SIP in principal
+    const sipAmount = parseFloat(document.getElementById('recurringPayment').value) || 0;
+    const principalAmount = (parseFloat(principal) || 0) + sipAmount;
     const interestAmount = parseFloat(interest) || 0;
     
     if (principalAmount <= 0 && interestAmount <= 0) return;
@@ -2379,8 +2366,8 @@ function createCompoundChart(principal, interest) {
                 responsive: true,
                 maintainAspectRatio: false,
                 layout: {
-        padding: 8
-    },
+                    padding: 8
+                },
                 plugins: {
                     legend: {
                         display: false
@@ -2407,8 +2394,8 @@ function createGrowthChart(growthData) {
     const canvas = document.getElementById('growthChart');
     if (!canvas || !growthData || growthData.length === 0) return;
 
-    // Increase container height slightly
-    canvas.parentElement.style.height = (canvas.parentElement.offsetHeight + 3) + "px";
+    // FIX: Set a fixed height only once to stop growing each refresh
+    canvas.parentElement.style.height = "300px";
     
     const ctx = canvas.getContext('2d');
     
@@ -2464,9 +2451,9 @@ function createGrowthChart(growthData) {
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        left: 2,  // increased graph area on left by 2px
-                        bottom: 10,
-                        top: 2 // increased graph area bottom by 1px (was 12)
+                        left: -6,
+                        bottom: 34,
+                        top: -2
                     }
                 },
                 interaction: {
@@ -2546,7 +2533,7 @@ function createGrowthChart(growthData) {
                                 size: 12,
                                 weight: 'bold'
                             },
-                            padding: 0, // reduced to push graph left
+                            padding: 0,
                             maxRotation: 0,
                             minRotation: 0
                         },
@@ -2554,10 +2541,10 @@ function createGrowthChart(growthData) {
                             display: true,
                             text: 'Years',
                             font: {
-                                size: 13,
+                                size: 12,
                                 weight: 'bold'
                             },
-                            padding: {top: 0}
+                            padding: {top: -2}
                         }
                     },
                     y: {
@@ -2569,7 +2556,7 @@ function createGrowthChart(growthData) {
                                 size: 12,
                                 weight: 'bold'
                             },
-                            padding: 4,
+                            padding: 2,
                             callback: function(value) {
                                 if (currentCurrency === 'INR') {
                                     if (value >= 10000000) {
